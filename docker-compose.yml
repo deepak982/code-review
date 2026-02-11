@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database for application data
+  postgres:
+    image: postgres:16-alpine
+    container_name: code-review-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-code_review}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - code-review-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Qdrant vector database for embeddings
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: code-review-qdrant
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - code-review-network
+    restart: unless-stopped
+    environment:
+      - QDRANT_LOG_LEVEL=INFO
+
+  # Redis for session management and caching
+  redis:
+    image: redis:7-alpine
+    container_name: code-review-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - code-review-network
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_password}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local
+  qdrant_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  code-review-network:
+    driver: bridge

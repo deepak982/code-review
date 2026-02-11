@@ -1,0 +1,11 @@
+{
+  "name": "code-review-chat",
+  "version": "1.0.0",
+  "description": "AI Code Review Chat Application",
+  "scripts": {
+    "dev": "bash start-dev.sh",
+    "stop": "bash stop-dev.sh",
+    "backend": "cd backend && source env/bin/activate && python llm_service.py",
+    "frontend": "cd frontend && yarn dev"
+  }
+}
