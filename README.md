@@ -10,7 +10,15 @@ AI-powered code review system with real-time GitLab credential validation, JWT a
   - Encrypted token storage (Fernet encryption)
   - Multiple GitLab account support with custom naming
   - Edit and manage configurations with validation
-- **Modern UI**: Clean, professional interface built with React + TypeScript
+  - **Slash Commands**: Quick access to GitLab operations
+    - `/show-mr` - View open merge requests
+    - `/review-mr` - Review merge requests with AI assistance
+  - Direct API integration with GitLab projects
+- **AI-Powered Chat**: Natural language queries for GitLab operations
+- **Modern UI**:
+  - Clean, professional interface built with React + TypeScript
+  - Markdown rendering for rich responses
+  - Interactive slash command menu
 - **Database Stack**: PostgreSQL for data, Qdrant for vectors, Redis for caching
 - **Security First**: Bcrypt password hashing, SQL injection protection, encrypted secrets
 
@@ -73,6 +81,8 @@ code-review/
 │   ├── database.py          # Database connection setup
 │   ├── encryption.py        # Token encryption utilities
 │   ├── gitlab_validator.py  # GitLab API validation
+│   ├── gitlab_agent.py      # GitLab operations agent
+│   ├── gitlab_tools.py      # GitLab API tools (list MRs, get details)
 │   ├── llm_service.py       # Main FastAPI application
 │   ├── models.py            # SQLAlchemy models
 │   ├── schemas.py           # Pydantic schemas
@@ -84,6 +94,8 @@ code-review/
 │   │   ├── components/      # React components
 │   │   │   ├── Auth/       # Login, Register
 │   │   │   ├── ChatInterface.tsx
+│   │   │   ├── MarkdownRenderer.tsx  # Markdown content rendering
+│   │   │   ├── SlashCommandMenu.tsx  # Interactive command menu
 │   │   │   └── Sidebar/    # Settings sidebar
 │   │   │       └── GitLabConfigSidebar.tsx
 │   │   ├── services/       # API client, auth service
@@ -152,9 +164,14 @@ VITE_API_URL=http://localhost:3000
 - `PUT /api/gitlab/config/{id}` - Update configuration with validation
 - `DELETE /api/gitlab/config/{id}` - Delete configuration
 
-### Chat
+### Chat & GitLab Operations
 - `POST /api/chat` - Send message to AI (requires auth)
+- `POST /api/slash-command` - Execute GitLab slash commands (requires auth)
 - `GET /api/status` - Check model status
+
+**Available Slash Commands:**
+- `/show-mr` - List open merge requests from your GitLab project
+- `/review-mr` - View merge requests for AI-powered code review
 
 ## 🎯 Key Features Explained
 
@@ -170,6 +187,31 @@ When you add or update a GitLab configuration:
 - **Edit**: Update any field; token is optional (keeps existing if empty)
 - **Delete**: Remove configuration permanently
 - **Validate**: Real-time validation with spinner and status updates
+
+### Slash Commands for GitLab
+Type `/` in the chat to access quick commands:
+
+**`/show-mr`** - View Open Merge Requests
+- Lists all open merge requests from your configured GitLab project
+- Shows MR title, author, branch info, labels, and approval status
+- Displays in clean markdown format with direct links
+
+**`/review-mr`** - AI Code Review
+- Lists open merge requests
+- Select an MR number to get detailed code review
+- AI analyzes code changes and provides feedback
+
+**Usage:**
+1. Configure GitLab connection in settings (⚙️ icon)
+2. Type `/show-mr` or `/review-mr` in chat
+3. If you have multiple configs, select which one to use
+4. View results instantly
+
+**Natural Language Queries:**
+You can also use natural language like:
+- "Show me my merge requests"
+- "List all open MRs"
+- "Show details of MR !123"
 
 ### Security Features
 - **Passwords**: Hashed with bcrypt

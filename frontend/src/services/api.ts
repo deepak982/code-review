@@ -170,4 +170,22 @@ export const api = {
 
     return response.json()
   },
+
+  async sendSlashCommand(request: { command: string }): Promise<ChatResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/slash-command`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authService.getAuthHeader(),
+      },
+      body: JSON.stringify(request),
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.detail || "Failed to execute command")
+    }
+
+    return response.json()
+  },
 }

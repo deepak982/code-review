@@ -9,6 +9,8 @@ import { api } from "@/services/api"
 import type { Message, ModelStatus } from "@/types"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { toast } from "sonner"
+import SlashCommandMenu from "./SlashCommandMenu"
+import MarkdownRenderer from "./MarkdownRenderer"
 
 export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([])
@@ -16,7 +18,9 @@ export default function ChatInterface() {
   const [isLoading, setIsLoading] = useState(false)
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showSlashMenu, setShowSlashMenu] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     checkModelStatus()
@@ -41,6 +45,24 @@ export default function ChatInterface() {
     }
   }
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setInput(value)
+
+    // Show slash menu when "/" is typed at the start
+    if (value === "/") {
+      setShowSlashMenu(true)
+    } else {
+      setShowSlashMenu(false)
+    }
+  }
+
+  const handleSlashCommandSelect = (command: { id: string; label: string }) => {
+    setShowSlashMenu(false)
+    setInput(`/${command.id}`)
+    inputRef.current?.focus()
+  }
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
 
@@ -53,20 +75,36 @@ export default function ChatInterface() {
 
     setMessages((prev) => [...prev, userMessage])
     setInput("")
+    setShowSlashMenu(false)
     setIsLoading(true)
     setError(null)
 
     try {
-      const response = await api.sendMessage({ message: userMessage.content })
+      // Check if it's a slash command
+      if (userMessage.content.startsWith("/")) {
+        const response = await api.sendSlashCommand({ command: userMessage.content })
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: response.response,
-        timestamp: new Date(response.timestamp),
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: response.response,
+          timestamp: new Date(response.timestamp),
+        }
+
+        setMessages((prev) => [...prev, assistantMessage])
+      } else {
+        // Regular chat message
+        const response = await api.sendMessage({ message: userMessage.content })
+
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: response.response,
+          timestamp: new Date(response.timestamp),
+        }
+
+        setMessages((prev) => [...prev, assistantMessage])
       }
-
-      setMessages((prev) => [...prev, assistantMessage])
     } catch (err) {
       setError("Failed to get response from model")
       setMessages((prev) => prev.slice(0, -1))
@@ -222,9 +260,15 @@ export default function ChatInterface() {
                           : "bg-white text-slate-900 border border-slate-200 shadow-sm"
                       }`}
                     >
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                        {message.content}
-                      </p>
+                      {message.role === "user" ? (
+                        <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                          {message.content}
+                        </p>
+                      ) : (
+                        <div className="text-sm leading-relaxed">
+                          <MarkdownRenderer content={message.content} />
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-2 px-1">
@@ -291,15 +335,22 @@ export default function ChatInterface() {
           )}
 
           <div className="border-t border-slate-200 bg-white p-4">
-            <div className="flex gap-3 max-w-3xl mx-auto">
-              <Input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Type your message..."
-                disabled={isLoading || modelStatus?.status !== "active"}
-                className="flex-1 h-12 border-slate-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm"
-              />
+            <div className="relative flex gap-3 max-w-3xl mx-auto">
+              <div className="relative flex-1">
+                <SlashCommandMenu
+                  isOpen={showSlashMenu}
+                  onSelect={handleSlashCommandSelect}
+                />
+                <Input
+                  ref={inputRef}
+                  value={input}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Type your message or '/' for commands..."
+                  disabled={isLoading || modelStatus?.status !== "active"}
+                  className="flex-1 h-12 border-slate-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm"
+                />
+              </div>
               <Button
                 onClick={handleSend}
                 disabled={!input.trim() || isLoading || modelStatus?.status !== "active"}

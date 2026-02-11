@@ -30,12 +30,17 @@ from auth import (
 )
 from gitlab_validator import validate_gitlab_credentials
 from encryption import encrypt_token, decrypt_token
+from gitlab_agent import GitLabAgent
 
 env_path = Path(__file__).parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
+
+# Simple in-memory session storage for user context
+# In production, use Redis or similar
+user_sessions = {}
 
 app = FastAPI(
     title="Code Review AI Service",
@@ -358,10 +363,55 @@ async def get_status() -> ModelStatus:
 @app.post("/api/chat")
 async def chat(
     request: ChatRequest,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
 ) -> ChatResponse:
     """Send message to Ollama model (requires authentication)"""
     try:
+        # Check if message might be GitLab-related (broad check)
+        import re
+        gitlab_keywords = [
+            r'\bMR\b', r'\bmerge\s+request\b', r'\bgitlab\b',
+            r'!\d+', r'\bpull\s+request\b', r'\bPR\b',
+            r'\blist\b.*\brequest', r'\bshow\b.*\brequest',
+            r'\breview\b', r'\bcode\s+review\b'
+        ]
+
+        # Broad check - let the agent decide if it's truly GitLab-related
+        might_be_gitlab = any(re.search(pattern, request.message, re.IGNORECASE) for pattern in gitlab_keywords)
+
+        if might_be_gitlab:
+            # Get user's GitLab configurations
+            gitlab_configs = db.query(GitLabConfig).filter(
+                GitLabConfig.user_id == current_user.id
+            ).all()
+
+            if gitlab_configs:
+                # Create GitLab agent
+                gitlab_agent = GitLabAgent(
+                    user_id=str(current_user.id),
+                    gitlab_configs=gitlab_configs
+                )
+
+                # Get last used config from session
+                user_session = user_sessions.get(str(current_user.id), {})
+                last_config_id = user_session.get('last_config_id')
+
+                # Let the agent intelligently handle the query
+                gitlab_response = await gitlab_agent.handle_query(
+                    request.message,
+                    last_config_id=last_config_id
+                )
+
+                # If agent determined it's a GitLab query, return the response
+                if gitlab_response:
+                    return ChatResponse(
+                        response=gitlab_response,
+                        model=os.getenv("OLLAMA_MODEL", "llama3.2"),
+                        timestamp=datetime.now().isoformat()
+                    )
+
+        # Fall back to regular chat
         run_output = agent.run(request.message)
 
         response_text = ""
@@ -384,6 +434,65 @@ async def chat(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Model error: {str(e)}")
+
+
+@app.post("/api/slash-command")
+async def handle_slash_command(
+    request: dict,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+) -> ChatResponse:
+    """
+    Handle slash commands with GitLab agent
+
+    Args:
+        request: Request containing command string
+        current_user: Authenticated user
+        db: Database session
+
+    Returns:
+        ChatResponse: Agent response asking for config selection or command result
+    """
+    try:
+        command = request.get("command", "")
+
+        # Get user's GitLab configurations
+        gitlab_configs = db.query(GitLabConfig).filter(
+            GitLabConfig.user_id == current_user.id
+        ).all()
+
+        # Create GitLab agent
+        gitlab_agent = GitLabAgent(
+            user_id=str(current_user.id),
+            gitlab_configs=gitlab_configs
+        )
+
+        # Auto-select config if user only has one active config
+        active_configs = [c for c in gitlab_configs if c.is_active]
+        if len(active_configs) == 1:
+            config_id = str(active_configs[0].id)
+            response_text = await gitlab_agent.process_with_config(command, config_id)
+
+            # Store last used config in session
+            user_sessions[str(current_user.id)] = {
+                'last_config_id': config_id,
+                'last_command': command
+            }
+        else:
+            # Ask user to select a config
+            response_text = await gitlab_agent.process_command(command)
+
+        return ChatResponse(
+            response=response_text,
+            model=os.getenv("OLLAMA_MODEL", "llama3.2"),
+            timestamp=datetime.now().isoformat()
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process command: {str(e)}"
+        )
 
 
 @app.get("/health")
