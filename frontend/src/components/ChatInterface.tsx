@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { Send, Bot, User, AlertCircle, Copy, RefreshCw } from "lucide-react"
+import "@uiw/react-markdown-preview/markdown.css"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,7 +11,7 @@ import type { Message, ModelStatus } from "@/types"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { toast } from "sonner"
 import SlashCommandMenu from "./SlashCommandMenu"
-import MarkdownRenderer from "./MarkdownRenderer"
+import MarkdownPreview from "@uiw/react-markdown-preview"
 
 export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([])
@@ -265,8 +266,23 @@ export default function ChatInterface() {
                           {message.content}
                         </p>
                       ) : (
-                        <div className="text-sm leading-relaxed">
-                          <MarkdownRenderer content={message.content} />
+                        <div className="text-sm leading-relaxed w-full">
+                          <MarkdownPreview
+                            source={message.content}
+                            style={{
+                              backgroundColor: 'transparent',
+                              color: '#0f172a',
+                              fontSize: '0.875rem',
+                              lineHeight: '1.625',
+                              width: '100%',
+                              maxWidth: '100%',
+                              padding: 0,
+                              wordBreak: 'break-word',
+                            }}
+                            wrapperElement={{
+                              "data-color-mode": "light"
+                            }}
+                          />
                         </div>
                       )}
                     </div>

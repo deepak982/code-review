@@ -25,3 +25,53 @@ body {
   margin: 0;
   font-family: system-ui, -apple-system, sans-serif;
 }
+
+/* Custom Markdown Preview Styles */
+.wmde-markdown {
+  font-family: inherit !important;
+}
+
+.wmde-markdown pre {
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  border-radius: 0.5rem !important;
+  margin: 0.75rem 0 !important;
+}
+
+.wmde-markdown code {
+  word-break: break-word !important;
+  white-space: pre-wrap !important;
+}
+
+.wmde-markdown pre code {
+  white-space: pre !important;
+  word-break: normal !important;
+}
+
+.wmde-markdown table {
+  display: block !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+}
+
+.wmde-markdown img {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+.wmde-markdown p {
+  margin: 0.5rem 0 !important;
+}
+
+.wmde-markdown ul,
+.wmde-markdown ol {
+  margin: 0.5rem 0 !important;
+  padding-left: 1.5rem !important;
+}
+
+.wmde-markdown blockquote {
+  border-left: 4px solid #cbd5e1 !important;
+  padding-left: 1rem !important;
+  margin: 0.75rem 0 !important;
+  color: #64748b !important;
+}
